@@ -1,0 +1,230 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8"/>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title> G.S · Object Detection System </title>
+  <link href="https://fonts.googleapis.com/css2?family=Share+Tech+Mono&family=Orbitron:wght@400;600;700;900&family=Rajdhani:wght@300;400;500;600;700&display=swap" rel="stylesheet"/>
+  <link rel="stylesheet" href="style.css"/>
+</head>
+<body>
+
+  <!-- Scanline overlay -->
+  <div class="scanlines"></div>
+  <!-- Grid bg -->
+  <div class="grid-bg"></div>
+
+  <!-- TOP HUD BAR -->
+  <header class="hud-header">
+    <div class="hud-left">
+      <div class="sys-logo">
+        <span class="bracket">[</span>
+        <span class="logo-text">VISION<span class="accent"> </span>AI-by G.S</span>
+        <span class="bracket">]</span>
+      </div>
+      <div class="sys-info">
+        <span class="tag">SYS v4.2.1</span>
+        <span class="tag">YOLO·SORT</span>
+        <span class="tag">CODEALPHA · TASK 04</span>
+      </div>
+    </div>
+    <div class="hud-center">
+      <div class="status-row">
+        <div class="status-item" id="statusSystem">
+          <span class="dot red"></span>
+          <span>SYSTEM STANDBY</span>
+        </div>
+        <div class="status-item" id="statusFps">
+          <span class="dot"></span>
+          <span id="fpsLabel">-- FPS</span>
+        </div>
+      </div>
+    </div>
+    <div class="hud-right">
+      <div class="clock" id="clockDisplay">00:00:00</div>
+      <div class="date-display" id="dateDisplay"></div>
+    </div>
+  </header>
+
+  <!-- MAIN LAYOUT -->
+  <div class="main-layout">
+
+    <!-- LEFT PANEL -->
+    <aside class="left-panel">
+      <div class="panel-block">
+        <div class="panel-title">◈ DETECTION CONFIG</div>
+
+        <div class="ctrl-group">
+          <label>CONFIDENCE THRESHOLD</label>
+          <div class="slider-row">
+            <input type="range" id="confSlider" min="10" max="95" value="50" oninput="updateConf(this.value)"/>
+            <span class="slider-val" id="confVal">50%</span>
+          </div>
+        </div>
+
+        <div class="ctrl-group">
+          <label>DETECTION MODE</label>
+          <div class="mode-btns">
+            <button class="mode-btn active" onclick="setMode(this,'ALL')">ALL</button>
+            <button class="mode-btn" onclick="setMode(this,'PERSON')">PERSON</button>
+            <button class="mode-btn" onclick="setMode(this,'VEHICLE')">VEHICLE</button>
+            <button class="mode-btn" onclick="setMode(this,'OBJECT')">OBJECT</button>
+          </div>
+        </div>
+
+        <div class="ctrl-group">
+          <label>BOUNDING BOX STYLE</label>
+          <div class="mode-btns">
+            <button class="mode-btn active" onclick="setBoxStyle(this,'corner')">CORNER</button>
+            <button class="mode-btn" onclick="setBoxStyle(this,'full')">FULL</button>
+            <button class="mode-btn" onclick="setBoxStyle(this,'dot')">DOT</button>
+          </div>
+        </div>
+
+        <div class="ctrl-group">
+          <label>TRACKING TRAIL</label>
+          <div class="toggle-row">
+            <label class="toggle">
+              <input type="checkbox" id="trailToggle" checked/>
+              <span class="slider-track"></span>
+            </label>
+            <span class="toggle-label" id="trailLabel">ON</span>
+          </div>
+        </div>
+      </div>
+
+      <div class="panel-block">
+        <div class="panel-title">◈ INPUT SOURCE</div>
+        <button class="action-btn primary" id="webcamBtn" onclick="startWebcam()">
+          <span class="btn-icon">◉</span> ACTIVATE WEBCAM
+        </button>
+        <div class="divider-text">— OR UPLOAD —</div>
+        <label class="action-btn secondary" for="videoUpload">
+          <span class="btn-icon">⬆</span> UPLOAD VIDEO
+        </label>
+        <input type="file" id="videoUpload" accept="video/*" onchange="loadVideo(this)" hidden/>
+        <label class="action-btn secondary" for="imageUpload">
+          <span class="btn-icon">⬆</span> UPLOAD IMAGE
+        </label>
+        <input type="file" id="imageUpload" accept="image/*" onchange="loadImage(this)" hidden/>
+      </div>
+
+      <div class="panel-block">
+        <div class="panel-title">◈ SYSTEM LOG</div>
+        <div class="log-box" id="logBox">
+          <div class="log-line init">[INIT] VISION-AI SYSTEM READY</div>
+          <div class="log-line">[SYS] Awaiting input source...</div>
+        </div>
+      </div>
+    </aside>
+
+    <!-- CENTER: VIDEO CANVAS -->
+    <section class="center-view">
+      <div class="viewport-wrap" id="viewportWrap">
+        <!-- Corner decorations -->
+        <div class="corner tl"></div>
+        <div class="corner tr"></div>
+        <div class="corner bl"></div>
+        <div class="corner br"></div>
+
+        <!-- Reticle overlay when idle -->
+        <div class="idle-overlay" id="idleOverlay">
+          <div class="reticle">
+            <div class="reticle-ring r1"></div>
+            <div class="reticle-ring r2"></div>
+            <div class="reticle-cross ch"></div>
+            <div class="reticle-cross cv"></div>
+          </div>
+          <p class="idle-text">AWAITING FEED</p>
+          <p class="idle-sub">Activate webcam or upload video / image</p>
+        </div>
+
+        <video id="videoEl" autoplay muted playsinline></video>
+        <canvas id="detectCanvas"></canvas>
+
+        <!-- HUD overlays on canvas -->
+        <div class="canvas-hud top-hud">
+          <span id="hudSource">SOURCE: --</span>
+          <span id="hudRes">RES: --</span>
+        </div>
+        <div class="canvas-hud bot-hud">
+          <span id="hudObjects">OBJECTS: 0</span>
+          <span id="hudMode">MODE: ALL</span>
+          <span id="hudConf">CONF: 50%</span>
+        </div>
+
+        <!-- Scan line animation when running -->
+        <div class="scan-sweep" id="scanSweep"></div>
+      </div>
+
+      <!-- PLAYBACK CONTROLS -->
+      <div class="playback-bar">
+        <button class="ctrl-icon-btn" id="playPauseBtn" onclick="togglePlayPause()" disabled title="Play / Pause">⏸</button>
+        <button class="ctrl-icon-btn" id="stopBtn" onclick="stopAll()" disabled title="Stop">⏹</button>
+        <button class="ctrl-icon-btn" id="snapBtn" onclick="takeSnapshot()" disabled title="Snapshot">📷</button>
+        <div class="rec-indicator" id="recIndicator">
+          <span class="dot red blink"></span> LIVE
+        </div>
+      </div>
+    </section>
+
+    <!-- RIGHT PANEL -->
+    <aside class="right-panel">
+      <div class="panel-block">
+        <div class="panel-title">◈ DETECTION STATS</div>
+        <div class="stat-grid">
+          <div class="stat-card">
+            <div class="stat-val" id="statTotal">0</div>
+            <div class="stat-lbl">TOTAL DETECTED</div>
+          </div>
+          <div class="stat-card">
+            <div class="stat-val" id="statFrames">0</div>
+            <div class="stat-lbl">FRAMES PROCESSED</div>
+          </div>
+          <div class="stat-card">
+            <div class="stat-val" id="statFps">--</div>
+            <div class="stat-lbl">LIVE FPS</div>
+          </div>
+          <div class="stat-card">
+            <div class="stat-val" id="statConf">--</div>
+            <div class="stat-lbl">AVG CONFIDENCE</div>
+          </div>
+        </div>
+      </div>
+
+      <div class="panel-block">
+        <div class="panel-title">◈ OBJECT REGISTRY</div>
+        <div class="obj-list" id="objList">
+          <div class="obj-empty">No objects detected yet.</div>
+        </div>
+      </div>
+
+      <div class="panel-block">
+        <div class="panel-title">◈ CLASS BREAKDOWN</div>
+        <div class="class-bars" id="classBars">
+          <div class="obj-empty">Waiting for detections...</div>
+        </div>
+      </div>
+
+      <div class="panel-block">
+        <div class="panel-title">◈ HOW IT WORKS</div>
+        <ol class="how-steps">
+          <li><span class="step-num">01</span>Live frames captured from webcam / video</li>
+          <li><span class="step-num">02</span>Each frame sent to YOLO model via TensorFlow.js</li>
+          <li><span class="step-num">03</span>Bounding boxes drawn with class labels & confidence</li>
+          <li><span class="step-num">04</span>SORT algorithm assigns tracking IDs per object</li>
+          <li><span class="step-num">05</span>Trail paths rendered for each tracked object</li>
+        </ol>
+      </div>
+    </aside>
+
+  </div>
+
+  <!-- Snapshot toast -->
+  <div class="snap-toast" id="snapToast">📷 Snapshot saved!</div>
+
+  <script src="https://cdn.jsdelivr.net/npm/@tensorflow/tfjs@4.10.0/dist/tf.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/@tensorflow-models/coco-ssd@2.2.3/dist/coco-ssd.min.js"></script>
+  <script src="script.js"></script>
+</body>
+</html>
